@@ -1,13 +1,9 @@
-# swarm_backend.py
+
 """
-Dedalus Labs swarm-agent backend (single-file).
-- Async implementation using AsyncDedalus + DedalusRunner
+Project Assistant backend:
 - Classifier agent routes user input to sub-agents
 - Each sub-agent calls the model to produce a structured list of constraints & micro-solutions
 - Synchroniser aggregates the stack and resolves conflicts
-Notes:
-- Replace model names / MCP servers with your desired values.
-- This is designed for hackathon-quality prototyping and is intentionally modular.
 """
 
 import asyncio
@@ -21,18 +17,14 @@ from dedalus_labs import AsyncDedalus, DedalusRunner
 
 load_dotenv()
 
-# -------------------------
 # Logging
-# -------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
 logger = logging.getLogger("swarm-backend")
 
-# -------------------------
-# Data structures
-# -------------------------
+# Creating data structures
 @dataclass
 class AgentResult:
     agent_name: str
@@ -57,7 +49,6 @@ class SharedStack:
 
     async def get_all(self) -> List[AgentResult]:
         async with self._lock:
-            # return a shallow copy so aggregator can operate safely
             return list(self._stack)
 
     async def clear(self):
@@ -65,9 +56,7 @@ class SharedStack:
             self._stack.clear()
             logger.info("Stack cleared.")
 
-# -------------------------
-# Utility: model call wrapper
-# -------------------------
+# Utility - model call 
 async def call_model(
     runner: DedalusRunner,
     prompt: str,
@@ -96,9 +85,8 @@ async def call_model(
         return f"ERROR: model call failed: {e}"
 
 
-# -------------------------
 # Prompt templates
-# -------------------------
+
 CLASSIFIER_PROMPT = """
 You are the CLASSIFIER AGENT. A user has provided the following prompt:
 "{user_input}"
@@ -149,9 +137,8 @@ Your job:
 Return only JSON.
 """
 
-# -------------------------
 # Agents
-# -------------------------
+
 async def classifier_agent(
     user_input: str,
     runner: DedalusRunner,
@@ -310,8 +297,8 @@ async def synchroniser_agent(
             "notes": notes
         }
 
-# -------------------------
-# Main orchestration
+
+# Main orchestration handler
 # -------------------------
 async def handle_user_request(
     user_input: str,
@@ -330,17 +317,17 @@ async def handle_user_request(
     3. Run synchroniser to consolidate results
     4. Return the final consolidated plan
     """
-    # 1) classifier
+    # classification of tasks
     classification = await classifier_agent(user_input, runner, model=classifier_model, mcp_servers=mcp_servers)
     selected_agents = classification.get("selected_agents", [])
     if not selected_agents:
         logger.info("No agents selected by classifier. Defaulting to technical, design, deploy.")
         selected_agents = ["technical", "design", "deploy"]
 
-    # 2) run selected sub-agents
+    # running selected sub-agents
     await orchestrate_subagents(selected_agents, user_input, runner, stack, model=subagent_model, mcp_servers=mcp_servers)
 
-    # 3) synchroniser
+    # synchronisation of tasks
     final_plan = await synchroniser_agent(runner, stack, model=synchroniser_model, mcp_servers=mcp_servers)
 
     return {
@@ -350,10 +337,9 @@ async def handle_user_request(
     }
 
 
+# Running main (async)
 # -------------------------
-# Example main (async)
-# -------------------------
-async def async_main_example():
+async def async_main_():
     """
     Example entrypoint demonstrating:
     - AsyncDedalus + DedalusRunner
@@ -362,17 +348,17 @@ async def async_main_example():
     client = AsyncDedalus()
     runner = DedalusRunner(client)
 
-    # Shared stack for the session
+    # Shared stack for the running session
     stack = SharedStack()
 
-    # Example user prompt (replace with your input)
+    # (replace with your input)
     user_input = (
         "We want to build an autonomous RC plane prototype for a university competition. "
         "Focus on sensors, power, flight control, testing, budget of $2,000, and regulatory concerns."
     )
 
-    # MCP servers you want to include (optional)
-    mcp_servers = ["windsor/brave-search-mcp"]  # adapt as needed
+    # MCP servers you want to include (optional); change when needed
+    mcp_servers = ["windsor/brave-search-mcp"] 
 
     logger.info("Handling user request...")
     result = await handle_user_request(
@@ -388,24 +374,16 @@ async def async_main_example():
     # Pretty print results
     print("\n=== CLASSIFICATION ===")
     print(json.dumps(result["classification"], indent=2))
-
     print("\n=== STACK (agent outputs) ===")
     print(json.dumps(result["stack"], indent=2))
-
     print("\n=== FINAL PLAN ===")
     print(json.dumps(result["final_plan"], indent=2))
 
 
-# -------------------------
-# Sync wrapper for convenience
-# -------------------------
 def main():
     """Synchronous wrapper for local testing (calls the async main)."""
-    # Removed asyncio.run()
-    # asyncio.run(async_main_example())
     pass
 
 
 if __name__ == "__main__":
-    # Call the async function directly
-    await async_main_example()
+    await async_main()
