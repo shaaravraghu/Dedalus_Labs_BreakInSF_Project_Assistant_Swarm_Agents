@@ -11,5 +11,6 @@ The system runs entirely in one Python file. It uses multiple agents that call e
 
 ## Setup
 Install requirements:
+Create an environment file to place the API key.
 ```bash
 pip install dedalus-labs python-dotenv
